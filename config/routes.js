@@ -1,15 +1,22 @@
-const Redis = require('ioredis');
-const redis = new Redis(6379);
+const redis = require('redis');
+const client = redis.createClient();
+
+client.on('error', (err) => {
+  console.log('redis error!', err);
+});
 
 module.exports = (app, express) => {
-  app.get('/getStack', (req, res) => {
-
+  app.get('/getstack', (req, res) => {
+    let seed = req.body.id;
+    console.log(seed);
   });
   app.post('/save', (req, res) => {
     let data = req.body;
-    //create url associated with photo id
-    redis.set(data.id, data.url);
-    //add photo id to theme set
-    redis.ssad(data.theme, data.id);
+    console.log('posting...', data)
+    client.sadd(`set:${data.theme}`, data.id);
+    
+    client.hmset(`gps:${data.id}`, 'latitude', data.gps.lat, 'longitude', data.gps.long);
+    // TODO: CREATE SORTED SET BY TIME FOR PICTURES
+    res.send();
   });
 };
