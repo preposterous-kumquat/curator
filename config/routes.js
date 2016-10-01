@@ -21,17 +21,22 @@ module.exports = (app, express) => {
         long: data.long > 0 ? -(180 - data.long) : 180 - Math.abs(data.long)
       };
       console.log(data.long, oppLoc.long)
-      client.lrangeAsync(`list:${seedTheme}`, 0, 100)
+      client.lrangeAsync(`list:${seedTheme}`, 0, 400)
       .then( (list) => {
         let oneDirectionPoints = {};
-        for (let i = 0; i < list.length; i += 3) {
+        for (let i = 0; i < list.length; i += 4) {
           if (list[i] > Math.min(data.long, oppLoc.long) && list[i] < Math.max(data.long, oppLoc.long)) {
             oneDirectionPoints[list[i+2]] = {};
-            oneDirectionPoints[list[i+2]].lat = list[i+1];
-            oneDirectionPoints[list[i+2]].long = list[i];
+            oneDirectionPoints[list[i+2]].latitude = list[i+1];
+            oneDirectionPoints[list[i+2]].longitude = list[i];
+            oneDirectionPoints[list[i+2]].url = list[i+3];
           }
         }
-        console.log(oneDirectionPoints)
+        let orderedPoints = geolib.orderByDistance({latitude: data.lat, longitude: data.long}, oneDirectionPoints);
+
+        client.set(`stack:${seedId}`, JSON.stringify(orderedPoints));
+
+        res.send(orderedPoints);
       });
 
     });
@@ -41,7 +46,7 @@ module.exports = (app, express) => {
   app.post('/save', (req, res) => {
     let data = req.body;
     console.log('posting...', data)
-    client.lpush(`list:${data.theme}`, data.id, data.gps.lat, data.gps.long);
+    client.lpush(`list:${data.theme}`, data.url, data.id, data.gps.lat, data.gps.long);
     
     client.hmset(`gps:${data.id}`, 'lat', data.gps.lat, 'long', data.gps.long, 'url', data.url);
     // TODO: CREATE SORTED SET BY TIME FOR PICTURES
