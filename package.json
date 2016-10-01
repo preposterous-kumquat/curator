@@ -9,8 +9,10 @@
   "author": "Brian Kilrain <bkilrain@gmail.com>",
   "license": "ISC",
   "dependencies": {
+    "bluebird": "^3.4.6",
     "body-parser": "^1.15.2",
     "express": "^4.14.0",
+    "geolib": "^2.0.21",
     "georedis": "^3.0.3",
     "ioredis": "^2.4.0",
     "morgan": "^1.7.0",
