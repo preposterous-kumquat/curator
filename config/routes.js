@@ -20,10 +20,15 @@ module.exports = (app, express) => {
         lat: data.lat > 0 ? -(data.lat) : Math.abs(data.lat),
         long: data.long > 0 ? -(180 - data.long) : 180 - Math.abs(data.long)
       };
-      console.log(data.long, oppLoc.long)
+      console.log(data, 'data')
       client.lrangeAsync(`list:${seedTheme}`, 0, 400)
       .then( (list) => {
         let oneDirectionPoints = {};
+        oneDirectionPoints[seedId] = {
+          latitude: data.lat,
+          longitude: data.long,
+          url: data.url
+        };
         for (let i = 0; i < list.length; i += 4) {
           if (list[i] > Math.min(data.long, oppLoc.long) && list[i] < Math.max(data.long, oppLoc.long)) {
             oneDirectionPoints[list[i+2]] = {};
@@ -33,6 +38,9 @@ module.exports = (app, express) => {
           }
         }
         let orderedPoints = geolib.orderByDistance({latitude: data.lat, longitude: data.long}, oneDirectionPoints);
+
+        console.log(oppLoc)
+        console.log(orderedPoints);
 
         client.set(`stack:${seedId}`, JSON.stringify(orderedPoints));
 
