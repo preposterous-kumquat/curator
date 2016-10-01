@@ -16,8 +16,8 @@ module.exports = (app, express) => {
     let seedTheme = req.query.theme;
     client.hgetallAsync(`gps:${seedId}`).then( (data) => {
       let oppLoc = {
-        lat: data.latitude > 0 ? -(data.latitude) : Math.abs(data.latitude),
-        long: data.longitude > 0 ? -(180 - data.longitude) : 180 - Math.abs(data.longitude)
+        lat: data.lat > 0 ? -(data.lat) : Math.abs(data.lat),
+        long: data.long > 0 ? -(180 - data.long) : 180 - Math.abs(data.long)
       }
       console.log(oppLoc)
 
@@ -29,7 +29,7 @@ module.exports = (app, express) => {
     console.log('posting...', data)
     client.sadd(`set:${data.theme}`, data.id);
     
-    client.hmset(`gps:${data.id}`, 'latitude', data.gps.lat, 'longitude', data.gps.long, 'url', data.url);
+    client.hmset(`gps:${data.id}`, 'lat', data.gps.lat, 'long', data.gps.long, 'url', data.url);
     // TODO: CREATE SORTED SET BY TIME FOR PICTURES
     res.send();
   });
