@@ -11,19 +11,23 @@ client.on('error', (err) => {
 
 module.exports = (app, express) => {
   app.get('/getstack', (req, res) => {
-    console.log(req.query)
     let seedId = req.query.id;
     let seedTheme = req.query.theme;
+
+//FIND GPS DATA FOR SEED PHOTO AND GET COORDS FOR ANTIPODAL POINT
     client.hgetallAsync(`gps:${seedId}`)
     .then( (data) => {
       let oppLoc = {
         lat: data.lat > 0 ? -(data.lat) : Math.abs(data.lat),
         long: data.long > 0 ? -(180 - data.long) : 180 - Math.abs(data.long)
       };
-      console.log(data, 'data')
+      
+//GET 100 MOST RECENT PHOTOS IN SEED'S THEME      
       client.lrangeAsync(`list:${seedTheme}`, 0, 400)
       .then( (list) => {
+//DRAW A LINE BETWEEN SEED AND ANTIPODAL POINT AND TAKE ALL PHOTOS ALONG THAT LINE
         let oneDirectionPoints = {};
+        let stack = [];
         oneDirectionPoints[seedId] = {
           latitude: data.lat,
           longitude: data.long,
@@ -37,14 +41,22 @@ module.exports = (app, express) => {
             oneDirectionPoints[list[i+2]].url = list[i+3];
           }
         }
+//ORDER BY DISTANCE FROM SEED POINT
         let orderedPoints = geolib.orderByDistance({latitude: data.lat, longitude: data.long}, oneDirectionPoints);
+//NAIVE CURATOR (TAKES EVERY NTH PHOTO TO MAKE A STACK OF stackLength)
+        let stackLength = 5;
+        if (orderedPoints.length > stackLength) {
+          let pluckEvery = Math.floor(orderedPoints.length / stackLength);
+          for (var i = pluckEvery - 1; i < orderedPoints.length; i += pluckEvery) {
+            stack.push(orderedPoints[i]);
+          }
+        } else {
+          stack = orderedPoints;
+        }
 
-        console.log(oppLoc)
-        console.log(orderedPoints);
+        client.set(`stack:${seedId}`, JSON.stringify(stack));
 
-        client.set(`stack:${seedId}`, JSON.stringify(orderedPoints));
-
-        res.send(orderedPoints);
+        res.send(stack);
       });
 
     });
