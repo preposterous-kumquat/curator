@@ -4,6 +4,7 @@ const bluebird = require('bluebird');
 const client = redis.createClient({
   host: 'redis'
 });
+const request = require('request');
 bluebird.promisifyAll(redis.RedisClient.prototype);
 bluebird.promisifyAll(redis.Multi.prototype);
 
@@ -17,7 +18,7 @@ module.exports = (app, express) => {
     let seedTheme = req.query.theme;
 
 //FIND GPS DATA FOR SEED PHOTO AND GET COORDS FOR ANTIPODAL POINT
-    client.hgetallAsync(`gps:${seedId}`)
+    client.hgetallAsync(`photo:${seedId}`)
     .then( (data) => {
       let oppLoc = {
         lat: data.lat > 0 ? -(data.lat) : Math.abs(data.lat),
@@ -56,6 +57,7 @@ module.exports = (app, express) => {
           stack = orderedPoints;
         }
 
+        //save stack for later retrieval TODO: CHECK IF STACK EXISTS BEFORE MAKING QUERY TO MODEL
         client.set(`stack:${seedId}`, JSON.stringify(stack));
 
         res.send(stack);
@@ -68,9 +70,16 @@ module.exports = (app, express) => {
   app.post('/save', (req, res) => {
     let data = req.body;
     console.log('posting...', data)
-    client.lpush(`list:${data.theme}`, data.url, data.id, data.gps.lat, data.gps.long);
-    
-    client.hmset(`gps:${data.id}`, 'lat', data.gps.lat, 'long', data.gps.long, 'url', data.url);
+    // client.lpush(`list:${data.theme}`, data.url, data.id, data.gps.lat, data.gps.long);
+
+    // List for creating training corpus
+    client.lpush('trainingCorpus', data.id, data.theme, JSON.stringify(data.clarifaiKeywords))
+
+    // all data for each pic
+    client.hmset(`photo:${data.id}`, 'lat', data.gps.lat, 'long', data.gps.long, 'url', data.url, 'keywords', JSON.stringify(data.clarifaiKeywords));
+
+    request
+
     // TODO: CREATE SORTED SET BY TIME FOR PICTURES
     res.send();
   });
