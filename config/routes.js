@@ -24,43 +24,76 @@ module.exports = (app, express) => {
         lat: data.lat > 0 ? -(data.lat) : Math.abs(data.lat),
         long: data.long > 0 ? -(180 - data.long) : 180 - Math.abs(data.long)
       };
-      
-//GET 100 MOST RECENT PHOTOS IN SEED'S THEME      
-      client.lrangeAsync(`list:${seedTheme}`, 0, 400)
-      .then( (list) => {
-//DRAW A LINE BETWEEN SEED AND ANTIPODAL POINT AND TAKE ALL PHOTOS ALONG THAT LINE
-        let oneDirectionPoints = {};
-        let stack = [];
-        oneDirectionPoints[seedId] = {
-          latitude: data.lat,
-          longitude: data.long,
-          url: data.url
-        };
-        for (let i = 0; i < list.length; i += 4) {
-          if (list[i] > Math.min(data.long, oppLoc.long) && list[i] < Math.max(data.long, oppLoc.long)) {
-            oneDirectionPoints[list[i+2]] = {};
-            oneDirectionPoints[list[i+2]].latitude = list[i+1];
-            oneDirectionPoints[list[i+2]].longitude = list[i];
-            oneDirectionPoints[list[i+2]].url = list[i+3];
-          }
+
+//GET 100 MOST SIMILAR PHOTOS IN DB  
+      let config = {
+        method: 'GET',
+        uri: 'http://localhost:5000/query',
+        qs: {
+          id: seedId
         }
-//ORDER BY DISTANCE FROM SEED POINT
-        let orderedPoints = geolib.orderByDistance({latitude: data.lat, longitude: data.long}, oneDirectionPoints);
-//NAIVE CURATOR (TAKES EVERY NTH PHOTO TO MAKE A STACK OF stackLength)
-        let stackLength = 5;
-        if (orderedPoints.length > stackLength) {
-          let pluckEvery = Math.floor(orderedPoints.length / stackLength);
-          for (var i = pluckEvery - 1; i < orderedPoints.length; i += pluckEvery) {
-            stack.push(orderedPoints[i]);
-          }
+      }    
+      request(config, (err, list) => {
+        if (err) {
+          console.log('error getting list from Model', err);
         } else {
-          stack = orderedPoints;
+//DRAW A LINE BETWEEN SEED AND ANTIPODAL POINT AND TAKE ALL PHOTOS ALONG THAT LINE
+          let query = [];
+          let listArray = JSON.parse(list.body)
+          listArray.forEach( (id) => {
+            query.push('lat:' + id);
+            query.push('long:' + id);
+            query.push('url:' + id);
+          })
+          console.log(...query, 'aweurew')
+          client.mget(query, (err, listResults) => {
+            console.log(listResults, 'here the bey')
+
+            // let addIdsToList = [];
+            // for (var i = 0; i < listResults; i += 3) {
+            //   addIdsToList.push(listArray(shift));
+            //   addIdsToList.push()
+            // }
+            let oneDirectionPoints = {};
+            let stack = [];
+            oneDirectionPoints[seedId] = {
+              latitude: data.lat,
+              longitude: data.long,
+              url: data.url
+            };
+
+            console.log(listResults, 'listResults', data.long, oppLoc.long)
+            for (let i = 0; i < listResults.length; i += 3) {
+              if (listResults[i] && listResults[i+1] > Math.min(data.long, oppLoc.long) && listResults[i+1] < Math.max(data.long, oppLoc.long)) {
+                let id = listArray[Math.ceil(i/3)];
+                console.log(id)
+                oneDirectionPoints[id] = {};
+                oneDirectionPoints[id].latitude = listResults[i];
+                oneDirectionPoints[id].longitude = listResults[i+1];
+                oneDirectionPoints[id].url = listResults[i+2];
+              }
+            }
+            console.log(oneDirectionPoints, 'oneDirectionPoints')
+    //ORDER BY DISTANCE FROM SEED POINT
+            let orderedPoints = geolib.orderByDistance({latitude: data.lat, longitude: data.long}, oneDirectionPoints);
+    //NAIVE CURATOR (TAKES EVERY NTH PHOTO TO MAKE A STACK OF stackLength)
+            let stackLength = 5;
+            if (orderedPoints.length > stackLength) {
+              let pluckEvery = Math.floor(orderedPoints.length / stackLength);
+              for (var i = pluckEvery - 1; i < orderedPoints.length; i += pluckEvery) {
+                stack.push(orderedPoints[i]);
+              }
+            } else {
+              stack = orderedPoints;
+            }
+
+            //save stack for later retrieval TODO: CHECK IF STACK EXISTS BEFORE MAKING QUERY TO MODEL
+            client.set(`stack:${seedId}`, JSON.stringify(stack));
+
+            res.send(stack);  
+          })
+          // console.log(list);
         }
-
-        //save stack for later retrieval TODO: CHECK IF STACK EXISTS BEFORE MAKING QUERY TO MODEL
-        client.set(`stack:${seedId}`, JSON.stringify(stack));
-
-        res.send(stack);
       });
 
     });
@@ -78,9 +111,31 @@ module.exports = (app, express) => {
     // all data for each pic
     client.hmset(`photo:${data.id}`, 'lat', data.gps.lat, 'long', data.gps.long, 'url', data.url, 'keywords', JSON.stringify(data.clarifaiKeywords));
 
-    request
+    client.mset(`lat:${data.id}`, data.gps.lat, `long:${data.id}`, data.gps.long, `url:${data.id}`, data.url);
+
+    client.lrangeAsync('trainingCorpus', 0, -1)
+      .then( (list) => {
+        let json = [];
+        for (var i = 0; i < list.length; i += 3) {
+          json.push({
+            id: list[i+2],
+            tokens: JSON.parse(list[i])
+          });
+        }
+      let config = {
+        method: 'POST',
+        uri: 'http://localhost:5000/index',
+        json: json
+      };
+      request(config, (err, response, body) => {
+        if (err) {
+          console.log('error indexing document to model', err)
+        }
+        console.log(response, 'repsonse from PYTHON<<<<<<<<<<<<<<<<<<<<<<<<<<')
+        res.send();
+      })
+    });
 
     // TODO: CREATE SORTED SET BY TIME FOR PICTURES
-    res.send();
   });
 };
