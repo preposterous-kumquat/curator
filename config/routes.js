@@ -45,15 +45,8 @@ module.exports = (app, express) => {
             query.push('long:' + id);
             query.push('url:' + id);
           })
-          console.log(...query, 'aweurew')
+//QUERY REDIS FOR LATS, LONGS AND URLS OF EACH PHOTO
           client.mget(query, (err, listResults) => {
-            console.log(listResults, 'here the bey')
-
-            // let addIdsToList = [];
-            // for (var i = 0; i < listResults; i += 3) {
-            //   addIdsToList.push(listArray(shift));
-            //   addIdsToList.push()
-            // }
             let oneDirectionPoints = {};
             let stack = [];
             oneDirectionPoints[seedId] = {
@@ -62,7 +55,6 @@ module.exports = (app, express) => {
               url: data.url
             };
 
-            console.log(listResults, 'listResults', data.long, oppLoc.long)
             for (let i = 0; i < listResults.length; i += 3) {
               if (listResults[i] && listResults[i+1] > Math.min(data.long, oppLoc.long) && listResults[i+1] < Math.max(data.long, oppLoc.long)) {
                 let id = listArray[Math.ceil(i/3)];
@@ -73,16 +65,30 @@ module.exports = (app, express) => {
                 oneDirectionPoints[id].url = listResults[i+2];
               }
             }
-            console.log(oneDirectionPoints, 'oneDirectionPoints')
+            console.log(listArray, 'listArray')
     //ORDER BY DISTANCE FROM SEED POINT
             let orderedPoints = geolib.orderByDistance({latitude: data.lat, longitude: data.long}, oneDirectionPoints);
-    //NAIVE CURATOR (TAKES EVERY NTH PHOTO TO MAKE A STACK OF stackLength)
+    //TAKE THE MOST SIMILAR PHOTO FROM EACH REGION
+            console.log(orderedPoints, 'asdkfljasdkfljasdkfjalkdsfjlksadjflksajd')
             let stackLength = 5;
             if (orderedPoints.length > stackLength) {
               let pluckEvery = Math.floor(orderedPoints.length / stackLength);
-              for (var i = pluckEvery - 1; i < orderedPoints.length; i += pluckEvery) {
-                stack.push(orderedPoints[i]);
+              for (let i = 0; i < orderedPoints.length; i += pluckEvery) {
+                let lowestIndex = listArray.length - 1;
+                let mostSimilarInGroup;
+                for (let j = i; j < i + pluckEvery; j++) {
+                  let indexCheck = listArray.indexOf(orderedPoints[j].key)
+                  if (indexCheck < lowestIndex)
+                  lowestIndex = indexCheck;
+                  mostSimilarInGroup = orderedPoints[j];
+                }
+                stack.push(mostSimilarInGroup);
               }
+
+
+              // for (let i = pluckEvery - 1; i < orderedPoints.length; i += pluckEvery) {
+              //   stack.push(orderedPoints[i]);
+              // }
             } else {
               stack = orderedPoints;
             }
@@ -131,7 +137,7 @@ module.exports = (app, express) => {
         if (err) {
           console.log('error indexing document to model', err)
         }
-        console.log(response, 'repsonse from PYTHON<<<<<<<<<<<<<<<<<<<<<<<<<<')
+        // console.log(response, 'repsonse from PYTHON<<<<<<<<<<<<<<<<<<<<<<<<<<')
         res.send();
       })
     });
