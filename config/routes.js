@@ -1,7 +1,9 @@
 const redis = require('redis');
 const geolib = require('geolib');
 const bluebird = require('bluebird');
-const client = redis.createClient();
+const client = redis.createClient({
+  host: 'redis'
+});
 bluebird.promisifyAll(redis.RedisClient.prototype);
 bluebird.promisifyAll(redis.Multi.prototype);
 
