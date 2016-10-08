@@ -5,12 +5,15 @@ const client = redis.createClient({
   host: 'redis'
 });
 const request = require('request');
+const fs = require('fs');
 bluebird.promisifyAll(redis.RedisClient.prototype);
 bluebird.promisifyAll(redis.Multi.prototype);
 
 client.on('error', (err) => {
   console.log('redis error!', err);
 });
+
+let trainingCounter = 4501;
 
 module.exports = (app, express) => {
   app.get('/getstack', (req, res) => {
@@ -99,21 +102,21 @@ module.exports = (app, express) => {
       }
     })   
   });
-  
+
   app.post('/save', (req, res) => {
     let data = req.body;
     console.log('posting...', data)
     // client.lpush(`list:${data.theme}`, data.url, data.id, data.gps.lat, data.gps.long);
 
     // List for creating training corpus
-    client.lpush('trainingCorpus', data.id, data.theme, JSON.stringify(data.clarifaiKeywords))
+    client.lpush('index', data.id, data.theme, JSON.stringify(data.clarifaiKeywords))
 
     // all data for each pic
     client.hmset(`photo:${data.id}`, 'lat', data.gps.lat, 'long', data.gps.long, 'url', data.url, 'keywords', JSON.stringify(data.clarifaiKeywords));
 
     client.mset(`lat:${data.id}`, data.gps.lat, `long:${data.id}`, data.gps.long, `url:${data.id}`, data.url);
 
-    client.lrangeAsync('trainingCorpus', 0, -1)
+    client.lrangeAsync('index', 0, -1)
       .then( (list) => {
         let json = [];
         for (var i = 0; i < list.length; i += 3) {
@@ -122,20 +125,66 @@ module.exports = (app, express) => {
             tokens: JSON.parse(list[i])
           });
         }
-      let config = {
-        method: 'POST',
-        uri: 'http://localhost:5000/index',
-        json: json
-      };
-      request(config, (err, response, body) => {
-        if (err) {
-          console.log('error indexing document to model', err)
-        }
-        // console.log(response, 'repsonse from PYTHON<<<<<<<<<<<<<<<<<<<<<<<<<<')
-        res.send();
-      })
+        let config = {
+          method: 'POST',
+          uri: 'http://localhost:5000/index',
+          json: json
+        };
+        request(config, (err, response, body) => {
+          if (err) {
+            console.log('error indexing document to model', err)
+          }
+          // console.log(response, 'repsonse from PYTHON<<<<<<<<<<<<<<<<<<<<<<<<<<')
+          res.send();
+        })
     });
 
     // TODO: CREATE SORTED SET BY TIME FOR PICTURES
   });
+
+  app.post('/train', (req, res) => {
+
+    client.lrangeAsync('index', 0, -1)
+      .then( (list) => {
+        let json = [];
+        for (var i = 0; i < list.length; i += 3) {
+          json.push({
+            id: list[i+2],
+            tokens: JSON.parse(list[i])
+          });
+        }
+        let config = {
+          method: 'POST',
+          uri: 'http://localhost:5000/train',
+          json: trainingCorpus
+        }
+        request(config, (err, response, body) => {
+          if (err) {
+            console.log('error training model', err)
+          }
+          // console.log(response, 'repsonse from PYTHON<<<<<<<<<<<<<<<<<<<<<<<<<<')
+          res.send();
+        })
+    });
+  });
+
+  app.post('/getTrainingData', (req, res) => {
+    console.log(trainingCounter)
+    let batchSize = 20;
+    let config = {
+      method: 'POST',
+      uri: 'http://localhost:3001/getTrainingData',
+      json: {"firstNum":trainingCounter,"batchSize":batchSize}
+    };
+    request(config, (err, response, body) => {
+      console.log('response:', body);
+      trainingCounter += batchSize;
+      let appendMe = JSON.stringify(body).slice(1,-1) + ',\n';
+      fs.appendFile('trainingCorpus.json', appendMe, (err) => {
+        if (err) throw err;
+        console.log('The "data to append" was appended to file!');
+        res.send();
+      });
+    });
+  })
 };
