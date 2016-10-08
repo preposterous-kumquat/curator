@@ -1,7 +1,9 @@
 const redis = require('redis');
 const geolib = require('geolib');
 const bluebird = require('bluebird');
-const client = redis.createClient();
+const client = redis.createClient({
+  host: 'redis'
+});
 bluebird.promisifyAll(redis.RedisClient.prototype);
 bluebird.promisifyAll(redis.Multi.prototype);
 
@@ -11,7 +13,6 @@ client.on('error', (err) => {
 
 module.exports = (app, express) => {
   app.get('/getstack', (req, res) => {
-    console.log(req.query)
     let seedId = req.query.id;
     let seedTheme = req.query.theme;
     client.hgetallAsync(`gps:${seedId}`)
