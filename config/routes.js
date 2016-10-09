@@ -35,7 +35,7 @@ module.exports = (app, express) => {
     //GET 100 MOST SIMILAR PHOTOS IN DB  
           let config = {
             method: 'GET',
-            uri: 'http://localhost:5000/query',
+            uri: 'http://simserver:5000/query',
             qs: {
               id: seedId
             }
@@ -127,7 +127,7 @@ module.exports = (app, express) => {
         }
         let config = {
           method: 'POST',
-          uri: 'http://localhost:5000/index',
+          uri: 'http://simserver:5000/index',
           json: json
         };
         request(config, (err, response, body) => {
@@ -155,7 +155,7 @@ module.exports = (app, express) => {
         }
         let config = {
           method: 'POST',
-          uri: 'http://localhost:5000/train',
+          uri: 'simserver:5000/train',
           json: trainingCorpus
         }
         request(config, (err, response, body) => {
@@ -173,7 +173,7 @@ module.exports = (app, express) => {
     let batchSize = 20;
     let config = {
       method: 'POST',
-      uri: 'http://localhost:3001/getTrainingData',
+      uri: 'photo-processor:3001/getTrainingData',
       json: {"firstNum":trainingCounter,"batchSize":batchSize}
     };
     request(config, (err, response, body) => {
