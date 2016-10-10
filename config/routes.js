@@ -155,7 +155,7 @@ module.exports = (app, express) => {
         }
         let config = {
           method: 'POST',
-          uri: 'simserver:5000/train',
+          uri: 'http://simserver:5000/train',
           json: trainingCorpus
         }
         request(config, (err, response, body) => {
