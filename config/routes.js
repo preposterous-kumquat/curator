@@ -2,7 +2,7 @@ const redis = require('redis');
 const geolib = require('geolib');
 const bluebird = require('bluebird');
 const client = redis.createClient({
-  host: 'redis'
+  host: '0.0.0.0'
 });
 const request = require('request');
 const fs = require('fs');
