@@ -16,17 +16,22 @@ client.on('error', (err) => {
 let trainingCounter = 4501;
 
 module.exports = (app, express) => {
+
   app.get('/getstack', (req, res) => {
     let seedId = req.query.id;
     let seedTheme = req.query.theme;
 
+    console.log(seedId, 'seedId', seedTheme, 'seedTheme');
+
     client.get(`stack:${seedId}`, (err, savedStack) => {
       if (savedStack) {
-        res.send(JSON.parse(savedStack))
+        res.send(JSON.parse(savedStack));
       } else {
     //FIND GPS DATA FOR SEED PHOTO AND GET COORDS FOR ANTIPODAL POINT
         client.hgetallAsync(`photo:${seedId}`)
         .then( (data) => {
+          console.log(data, 'INVESTIGATING MISSING LAT, LONG ATTR');
+
           let oppLoc = {
             lat: data.lat > 0 ? -(data.lat) : Math.abs(data.lat),
             long: data.long > 0 ? -(180 - data.long) : 180 - Math.abs(data.long)
@@ -39,19 +44,24 @@ module.exports = (app, express) => {
             qs: {
               id: seedId
             }
-          }    
+          };   
           request(config, (err, list) => {
+            console.log('REQUEST TO MY SIM SERVER');
             if (err) {
               console.log('error getting list from Model', err);
             } else {
     //DRAW A LINE BETWEEN SEED AND ANTIPODAL POINT AND TAKE ALL PHOTOS ALONG THAT LINE
               let query = [];
-              let listArray = JSON.parse(list.body)
+
+              console.log('LIST FROM MY ID BACK FROM SIMSERVER', list, 'type of', typeof list);
+
+              let listArray = JSON.parse(list.body);                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  
               listArray.forEach( (id) => {
                 query.push('lat:' + id);
                 query.push('long:' + id);
                 query.push('url:' + id);
               })
+
     //QUERY REDIS FOR LATS, LONGS AND URLS OF EACH PHOTO
               client.mget(query, (err, listResults) => {
                 let oneDirectionPoints = {};
@@ -61,6 +71,8 @@ module.exports = (app, express) => {
                   longitude: data.long,
                   url: data.url
                 };
+                console.log(query, 'QUERY OBJECT =====================>');
+                console.log(listResults, 'LIST RESULTS =====================>');
 
                 for (let i = 0; i < listResults.length; i += 3) {
                   if (listResults[i] && listResults[i+1] > Math.min(data.long, oppLoc.long) && listResults[i+1] < Math.max(data.long, oppLoc.long)) {
@@ -73,6 +85,7 @@ module.exports = (app, express) => {
                   }
                 }
         //ORDER BY DISTANCE FROM SEED POINT
+                console.log(oneDirectionPoints, 'One Direction Points *******************');
                 let orderedPoints = geolib.orderByDistance({latitude: data.lat, longitude: data.long}, oneDirectionPoints);
         //TAKE THE MOST SIMILAR PHOTO FROM EACH REGION
                 let stackLength = 5;
@@ -93,6 +106,8 @@ module.exports = (app, express) => {
                   stack = orderedPoints;
                 }
                 //save stack for later retrieval 
+                console.log(JSON.stringify(stack), 'SAVED STACKED IN REDIS *******************');
+
                 client.set(`stack:${seedId}`, JSON.stringify(stack));
                 res.send(stack);  
               })
@@ -103,22 +118,49 @@ module.exports = (app, express) => {
     })   
   });
 
+  app.get('/getRandStack', (req, res) => {
+    client.keysAsync('stack:*')
+      .then((allStacks) => {
+        let stackIds = [];
+        allStacks.forEach((stack) => {
+          stackIds.push(+stack.split(':')[1]);
+        });
+        stackIds.sort((a, b) => b - a);
+        let limitStack = stackIds.slice(0, 6);
+
+        let actions = limitStack.map(getRandStacks);
+        let results = Promise.all(actions);
+        results
+          .then((randStacks) => {
+            res.json(randStacks);
+          })
+          .catch((err) => {
+            console.log('err', err);
+          });
+      });
+  });
+
   app.post('/save', (req, res) => {
+    console.log('I GOT TO MY /SAVE ROUTE =>>>> BoDY OF RESPONSE', req.body);
     let data = req.body;
     console.log('posting...', data)
     // client.lpush(`list:${data.theme}`, data.url, data.id, data.gps.lat, data.gps.long);
 
     // List for creating training corpus
-    client.lpush('index', data.id, data.theme, JSON.stringify(data.clarifaiKeywords))
+    client.lpush('index', data.id, data.theme, JSON.stringify(data.clarifaiKeywords));
+    console.log('AFTER lpush')
 
     // all data for each pic
     client.hmset(`photo:${data.id}`, 'lat', data.gps.lat, 'long', data.gps.long, 'url', data.url, 'keywords', JSON.stringify(data.clarifaiKeywords));
+    console.log('AFTER hmset')
 
     client.mset(`lat:${data.id}`, data.gps.lat, `long:${data.id}`, data.gps.long, `url:${data.id}`, data.url);
+    console.log('AFTER mset')
 
     client.lrangeAsync('index', 0, -1)
       .then( (list) => {
         let json = [];
+        console.log(list, 'MY LIST ==========================', typeof list, '<==================== list type');
         for (var i = 0; i < list.length; i += 3) {
           json.push({
             id: list[i+2],
@@ -132,12 +174,14 @@ module.exports = (app, express) => {
         };
         request(config, (err, response, body) => {
           if (err) {
-            console.log('error indexing document to model', err)
+            console.log('error indexing document to model', err);
           }
           // console.log(response, 'repsonse from PYTHON<<<<<<<<<<<<<<<<<<<<<<<<<<')
           res.send();
-        })
-    });
+        });
+      }).catch((err) => {
+        console.log('ERROR, inside lrangeAsync', err);
+      });
 
     // TODO: CREATE SORTED SET BY TIME FOR PICTURES
   });
@@ -188,3 +232,16 @@ module.exports = (app, express) => {
     });
   })
 };
+
+function getRandStacks(id) {
+  return new Promise((resolve, reject) => {
+    client.getAsync(`stack:${id}`)
+      .then((stacks) => {
+        console.log('All stacks', stacks);
+        resolve(JSON.parse(stacks));
+      })
+      .catch((err) => {
+        reject(err);
+      }); 
+  });
+} 
