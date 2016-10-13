@@ -4,7 +4,7 @@
   "description": "Curates photos based on distance and keywords",
   "main": "index.js",
   "scripts": {
-    "start": "nodemon",
+    "start": "forever index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "Brian Kilrain <bkilrain@gmail.com>",
