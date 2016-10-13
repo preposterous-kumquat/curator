@@ -16,7 +16,6 @@ Curator Micro-service for photo stack generation based on geo-location
 1. [Usage](#usage)
 1. [Docker Development](#docker-development)
     1. [Build Image](#build-image)
-    
 1. [Contributing](#contributing)
 
 ## Usage
