@@ -1,14 +1,15 @@
-# [Lensity](https://github.com/preposterous-kumquat/preposterous-kumquat)
-Curator Service
-Curator Micro-service for photo stack generation based on geo-location
 
+
+
+
+# Curator Service
+Curator Micro-service for photo stack generation based on geo-location.
+[Lensity repo](https://github.com/preposterous-kumquat/preposterous-kumquat)
 ## Team
 
   - __Product Owner__: [Josphine Eng](https://github.com/ChirpingMermaid)
   - __Scrum Master__: [Julie Truong](https://github.com/Truong-Julie)
   - __Development Team Members__: [Brian Kilrain](https://github.com/bkilrain)
-
-# Curator
 
 ## Table of Contents
 
