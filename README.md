@@ -1,7 +1,4 @@
 
-
-
-
 # Curator Service
 Curator Micro-service for photo stack generation based on geo-location.
 [Lensity repo](https://github.com/preposterous-kumquat/preposterous-kumquat)

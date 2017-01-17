@@ -13,7 +13,7 @@ client.on('error', (err) => {
   console.log('redis error!', err);
 });
 
-let trainingCounter = 4501;
+let trainingCounter = 8501;
 
 module.exports = (app, express) => {
 
@@ -159,6 +159,7 @@ module.exports = (app, express) => {
 
     client.lrangeAsync('index', 0, -1)
       .then( (list) => {
+        console.log(list)
         let json = [];
         console.log(list, 'MY LIST ==========================', typeof list, '<==================== list type');
         for (var i = 0; i < list.length; i += 3) {
@@ -217,7 +218,7 @@ module.exports = (app, express) => {
     let batchSize = 20;
     let config = {
       method: 'POST',
-      uri: 'photo-processor:3001/getTrainingData',
+      uri: 'http://photo-processor:3001/getTrainingData',
       json: {"firstNum":trainingCounter,"batchSize":batchSize}
     };
     request(config, (err, response, body) => {
@@ -225,9 +226,12 @@ module.exports = (app, express) => {
       trainingCounter += batchSize;
       let appendMe = JSON.stringify(body).slice(1,-1) + ',\n';
       fs.appendFile('trainingCorpus.json', appendMe, (err) => {
-        if (err) throw err;
-        console.log('The "data to append" was appended to file!');
-        res.send();
+        if (err) {
+          console.log(err);
+        } else {
+          console.log('The "data to append" was appended to file!');
+          res.send(); 
+        }
       });
     });
   })
